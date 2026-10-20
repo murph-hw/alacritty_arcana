@@ -1,0 +1,13 @@
+# alacritty_arcana: portable Alacritty setup.
+# The active theme is a copy in ~/.config/alacritty/theme.toml, written by arcana-theme,
+# so switching themes never changes this file.
+import = ["~/.config/alacritty/theme.toml"]
+
+[window]
+decorations = "None"
+startup_mode = "Fullscreen"
+padding = { x = 8, y = 6 }
+dynamic_padding = true
+
+[keyboard]
+bindings = [{ key = "F11", action = "ToggleFullscreen" }]

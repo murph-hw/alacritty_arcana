@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Switch the Alacritty theme.
+#   arcana-theme            list themes (* = active)
+#   arcana-theme <name>     switch to a theme
+#   arcana-theme fav [add|rm <name>]  list / edit favorites (tour fav = tour only favorites)
+#   arcana-theme tour [pat] step through themes (matching pat): Enter/→ = next, b/← = back, f = toggle favorite, k = keep, q = quit
+# The theme is copied to ~/.config/alacritty/theme.toml (imported by alacritty.toml); Alacritty reloads it live.
+repo=$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)
+active=~/.config/alacritty/theme.toml
+active_name=~/.config/alacritty/theme.name
+favs=$repo/favorites; touch "$favs"
+hidden=$repo/hidden
+is_fav() { grep -qx -- "$1" "$favs"; }
+toggle_fav() { if is_fav "$1"; then sed -i "/^$1\$/d" "$favs"; else echo "$1" >> "$favs"; fi; }
+dirs=("$repo/themes" ~/.config/alacritty/community/themes)
+names() { for d in "${dirs[@]}"; do ls "$d"/*.toml 2>/dev/null; done | xargs -n1 basename | sed 's/\.toml$//' | sort -u \
+  | grep -vxF -f <(grep -v '^#' "$hidden" 2>/dev/null; echo '#'); }
+path_of() { for d in "${dirs[@]}"; do [ -f "$d/$1.toml" ] && { echo "$d/$1.toml"; return; }; done; }
+current() { cat "$active_name" 2>/dev/null; }
+set_theme() { p=$(path_of "$1"); [ -n "$p" ] || { echo "no theme: $1"; return 1; }
+  cp "$p" "$active" && echo "$1" > "$active_name"; }
+case "$1" in
+  "") cur=$(current); names | while read -r n; do [ "$n" = "$cur" ] && echo "* $n" || echo "  $n"; done ;;
+  tour) start=$(current); if [ "$2" = fav ]; then mapfile -t list < "$favs"; else mapfile -t list < <(names | grep -i -- "${2:-.}"); fi
+    total=${#list[@]}; [ "$total" -gt 0 ] || { echo "no theme matches: $2"; exit 1; }
+    i=0
+    while [ "$i" -lt "$total" ]; do n=${list[$i]}; set_theme "$n"; clear
+      is_fav "$n" && star=" ★" || star=""
+      echo "== [$((i+1))/$total] $n$star =="; "$repo/bin/palette"
+      read -rsn1 -p "Enter/→=next  b/←=back  f=favorite  k=keep  q=quit " key; echo
+      # Arrow keys arrive as ESC [ C / ESC [ D
+      [ "$key" = $'\e' ] && { read -rsn2 -t 0.1 rest; key=$rest; }
+      case "$key" in
+        k) echo "kept $n"; exit ;;
+        q) break ;;
+        f) toggle_fav "$n" ;;
+        b|'[D') [ "$i" -gt 0 ] && i=$((i-1)) ;;
+        *) i=$((i+1)) ;;
+      esac
+    done; [ -n "$start" ] && set_theme "$start" && echo "restored $start" ;;
+  fav) case "$2" in
+      add) path_of "$3" >/dev/null && ! is_fav "$3" && echo "$3" >> "$favs" ;;
+      rm) is_fav "$3" && toggle_fav "$3" ;;
+    esac; cat "$favs" ;;
+  *) set_theme "$1" && echo "theme -> $1" ;;
+esac
